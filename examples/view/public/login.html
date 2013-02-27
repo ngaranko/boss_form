@@ -1,0 +1,10 @@
+
+<form action="" method="POST">
+{% if form.errors %}
+  {% for id, error in form.errors %}
+    {{ id }}: {{ error }}
+  {% endfor %}
+{% endif %}
+{{ form.fields }}
+<input type="submit" value="Login" />
+</form>
