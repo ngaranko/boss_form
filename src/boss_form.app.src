@@ -1,0 +1,15 @@
+{application, boss_form,
+    [
+    {description, "BossForm: django like forms"},
+    {vsn, "0.0.1"},
+    {registered, [
+        boss_form, boss_form_fields, boss_form_widget
+        ]},
+    {modules, []},
+    {applications, [
+        kernel,
+        stdlib,
+        crypto
+            ]},
+    {env, []}
+    ]}.
