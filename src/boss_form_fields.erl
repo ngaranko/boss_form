@@ -1,15 +1,26 @@
 -module(boss_form_fields).
 -compile(export_all).
 
+boolean_field(Name, Options, Value) ->
+    boss_form_widget:widget(checkbox_input, Name, Options, Value).
 
-%% Sets default input value
-input_element(Type, Name, undefined, Options) ->
-    input_element(Type, Name, proplists:get_value(default, Options, ""), Options);
-input_element(Type, Name, Value, Options) ->
-    io_lib:format("<input type='~s' name='~s' value='~s' />", [Type, Name, Value]).
+boolean_field_clean(Value) ->
+    case Value of
+        "" -> false;
+        "0" -> false;
+        undefined -> false;
+        Value -> true
+    end.
 
 char_field(Name, Options, Value) ->
-    input_element(text, Name, Value, Options).
+    boss_form_widget:widget(text_input, Name, Options, Value).
 
-password_field(Name, Options, Value) ->
-    input_element(password, Name, Value, Options).
+char_field_clean(Value) ->
+    %% TODO: Add cleaning
+    Value.
+
+choice_field(Name, Options, Value) ->
+    boss_form_widget:widget(select, Name, Options, Value).
+
+choice_field_clean(Value) ->
+    Value.
