@@ -15,7 +15,7 @@ fields(Fields, InitialData) ->
 
 %% Draw form fields
 field_html(FieldName, Options, InitialData) ->
-    Value = request_field_value(FieldName, InitialData),
+    Value = request_field_value(FieldName, InitialData, proplists:get_value(default, Options)),
     FieldType = proplists:get_value(type, Options, char_field),
     apply(boss_form_fields, FieldType, [FieldName, Options, Value]).
 
@@ -24,15 +24,19 @@ field_label(FieldName, Options) ->
                   [atom_to_list(FieldName), proplists:get_value(label, Options, atom_to_list(FieldName))]).
 
 %% Output form as table
-as_table(Fields, InitialData, Errors) ->
+as_table(Fields, InitialData, _Errors) ->
     [io_lib:format("<tr><td>~s</td><td>~s</td></tr>",
         [field_label(FieldName, Options),
          field_html(FieldName, Options, InitialData)]) || {FieldName, Options} <- Fields].
 
 %% Clean
-clean_field(FieldName, Value, FieldType) ->
+clean_field(_FieldName, Value, Options, FieldType) ->
     Cleaner = list_to_atom(string:concat(atom_to_list(FieldType), "_clean")),
-    apply(boss_form_fields, Cleaner, [Value]).
+    Exports = boss_form_fields:module_info(exports),
+    case proplists:get_value(Cleaner, Exports, 1) of
+        1 -> apply(boss_form_fields, Cleaner, [Value]);
+        2 -> apply(boss_form_fields, Cleaner, [Value, Options])
+    end.
 
 %% Validation
 validate(Form, RequestData) ->
@@ -44,7 +48,7 @@ validate(Form, RequestData) ->
     CleanedData = get_processed_data(ProcessedFields),
     case proplists:is_defined(error, ProcessedFields) of
         true ->
-            FormData = update_form_data(Form, CleanedData),
+            FormData = update_form_data(Form, get_processed_data(ProcessedFields, RequestData)),
             {error, FormModule:new(FormData, [Data || {error, Data} <- ProcessedFields])};
         false ->
             {ok, CleanedData}
@@ -53,17 +57,27 @@ validate(Form, RequestData) ->
 get_processed_data(ProcessedFields) ->
     [{FieldName, Value} || {ok, FieldName, Value} <- ProcessedFields].
 
+get_processed_data(ProcessedFields, RequestData) ->
+    CleanedData = get_processed_data(ProcessedFields),
+    [{list_to_atom(FieldName),
+     request_field_value(list_to_atom(FieldName), RequestData, proplists:get_value(list_to_atom(FieldName), CleanedData))} || {FieldName, _} <- RequestData].
+
 %% Validate field
 validate_field(Form, FieldName, Options, RequestData) ->
-    Value = request_field_value(FieldName, RequestData, undefined),
-    CleanedValue = clean_field(FieldName, Value, proplists:get_value(type, Options, char_field)), %% Validate as string by default
-    case validate_required(Options, CleanedValue) of
-        error -> {error, [FieldName, "This field is required"]};
-        ok ->
-            case validate_apply_form(Form, FieldName, Options, RequestData) of
-                ok -> {ok, FieldName, CleanedValue};
-                {ok, ValidValue} -> {ok, FieldName, ValidValue};
-                {error, ErrorMessage} -> {error, [FieldName, ErrorMessage]}
+    Value = request_field_value(FieldName, RequestData, proplists:get_value(default, Options, undefined)),
+    CleanedValue = clean_field(FieldName, Value, Options, proplists:get_value(type, Options, char_field)), %% Validate as string by default
+    case CleanedValue of
+        {error, ErrorData} ->
+            {error, [FieldName, ErrorData]};
+        OtherValue ->
+            case validate_required(Options, OtherValue) of
+                error -> {error, [FieldName, "This field is required"]};
+                ok ->
+                    case validate_apply_form(Form, FieldName, Options, RequestData) of
+                        ok -> {ok, FieldName, OtherValue};
+                        {ok, ValidValue} -> {ok, FieldName, ValidValue};
+                        {error, ErrorMessage} -> {error, [FieldName, ErrorMessage]}
+                    end
             end
     end.
 
@@ -94,13 +108,27 @@ validate_required(Options, Value) ->
 update_form_data(Form, RequestData) ->
     %% Collect fields data, and fill it with InitialValue or ""
     %% Fill data from request, if possible
-    
-    [{FieldName, proplists:get_value(atom_to_list(FieldName),
+    [{FieldName, proplists:get_value(FieldName,
                                      RequestData,
                                      proplists:get_value(FieldName, Form:data(), ""))} || {FieldName, _} <- Form:form_fields()].
 
+%% Get field value from request
 request_field_value(FieldName, RequestData) ->
     request_field_value(FieldName, RequestData, undefined).
 
 request_field_value(FieldName, RequestData, DefaultValue) ->
-    proplists:get_value(atom_to_list(FieldName), RequestData, DefaultValue).
+    case proplists:get_value(FieldName, RequestData, proplists:get_value(atom_to_list(FieldName), RequestData)) of
+        undefined -> DefaultValue;
+        "" -> DefaultValue;
+        Other -> Other
+    end.
+
+update_model(Model, Data) ->
+    update_model(Model, Data, Model:attributes()).
+
+update_model(Model, _Data, []) ->
+    Model;
+update_model(Model, Data, [{id, _Value} | Attrs]) ->
+    update_model(Model, Data, Attrs);
+update_model(Model, Data, [{AttrName, Value} | Attrs]) ->
+    update_model(Model:set(AttrName, proplists:get_value(AttrName, Data, Value)), Data, Attrs).
