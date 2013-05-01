@@ -15,19 +15,34 @@ fields(Fields, InitialData) ->
 
 %% Draw form fields
 field_html(FieldName, Options, InitialData) ->
-    Value = request_field_value(FieldName, InitialData, proplists:get_value(default, Options)),
+    Value = request_field_value(FieldName, InitialData, proplists:get_value(initial, Options)),
     FieldType = proplists:get_value(type, Options, char_field),
     apply(boss_form_fields, FieldType, [FieldName, Options, Value]).
 
+%% Draw field label
 field_label(FieldName, Options) ->
     io_lib:format("<label for='id_~s'>~s</label>",
                   [atom_to_list(FieldName), proplists:get_value(label, Options, atom_to_list(FieldName))]).
 
 %% Output form as table
-as_table(Fields, InitialData, _Errors) ->
-    [io_lib:format("<tr><td>~s</td><td>~s</td></tr>",
-        [field_label(FieldName, Options),
-         field_html(FieldName, Options, InitialData)]) || {FieldName, Options} <- Fields].
+as_table(Fields, InitialData, Errors) ->
+    form_output("<tr><td>~s</td><td>~s~s</td></tr>", table, Fields, InitialData, Errors).
+
+%% Output form as p
+as_p(Fields, InitialData, Errors) ->
+    form_output("<p>~s: ~s ~s</p>", p, Fields, InitialData, Errors).
+
+%% Build form output
+form_output(Tpl, Type, Fields, InitialData, Errors) ->
+    form_output(Tpl, Type, Fields, InitialData, Errors, "").
+
+form_output(_Tpl, _Type, [], _InitialData, _Errors, Html) ->
+    Html;
+form_output(Tpl, Type, [{FieldName, Options} | Fields], InitialData, Errors, Html) ->
+    Result = io_lib:format(Tpl, [field_label(FieldName, Options),
+                                 field_html(FieldName, Options, InitialData),
+                                 build_help_text(Options, Type)]),
+    form_output(Tpl, Type, Fields, InitialData, Errors, io_lib:format("~s~s", [Html, Result])).
 
 %% Clean
 clean_field(_FieldName, Value, Options, FieldType) ->
@@ -40,11 +55,15 @@ clean_field(_FieldName, Value, Options, FieldType) ->
 
 %% Validation
 validate(Form, RequestData) ->
+    validate(Form, RequestData, []).
+
+validate(Form, RequestData, UploadedFiles) ->
     FormModule = element(1, Form),
     ProcessedFields = [validate_field(Form,
                                       FieldName,
                                       Options,
-                                      RequestData) || {FieldName, Options} <- Form:form_fields()],
+                                      RequestData,
+                                      UploadedFiles) || {FieldName, Options} <- Form:form_fields()],
     CleanedData = get_processed_data(ProcessedFields),
     case proplists:is_defined(error, ProcessedFields) of
         true ->
@@ -54,6 +73,7 @@ validate(Form, RequestData) ->
             {ok, CleanedData}
     end.
 
+%% Get cleaned data
 get_processed_data(ProcessedFields) ->
     [{FieldName, Value} || {ok, FieldName, Value} <- ProcessedFields].
 
@@ -64,14 +84,23 @@ get_processed_data(ProcessedFields, RequestData) ->
 
 %% Validate field
 validate_field(Form, FieldName, Options, RequestData) ->
-    Value = request_field_value(FieldName, RequestData, proplists:get_value(default, Options, undefined)),
+    validate_field(Form, FieldName, Options, RequestData, []).
+validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
+    Value = case proplists:get_value(type, Options, char_field) of
+                file_field ->
+                    request_file_field_value(FieldName, UploadedFiles, proplists:get_value(initial, Options, undefined));
+                _Other ->
+                    request_field_value(FieldName, RequestData, proplists:get_value(initial, Options, undefined))
+            end,
     CleanedValue = clean_field(FieldName, Value, Options, proplists:get_value(type, Options, char_field)), %% Validate as string by default
     case CleanedValue of
         {error, ErrorData} ->
             {error, [FieldName, ErrorData]};
         OtherValue ->
             case validate_required(Options, OtherValue) of
-                error -> {error, [FieldName, "This field is required"]};
+                error ->
+                    ErrorMessages = proplists:get_value(error_messages, Options, []),
+                    {error, [FieldName, proplists:get_value(requried, ErrorMessages, "This field is required")]};
                 ok ->
                     case validate_apply_form(Form, FieldName, Options, RequestData) of
                         ok -> {ok, FieldName, OtherValue};
@@ -123,6 +152,21 @@ request_field_value(FieldName, RequestData, DefaultValue) ->
         Other -> Other
     end.
 
+%% Get field value from uploaded files
+request_file_field_value(FieldName, UploadedFiles) ->
+    request_file_field_value(FieldName, UploadedFiles, undefined).
+
+request_file_field_value(_FieldName, [], DefaultValue) ->
+    DefaultValue;
+request_file_field_value(FieldName, [File | UploadedFiles], DefaultValue) ->
+    case FieldName =:= list_to_atom(uploaded_file:field_name(File)) of
+        true ->
+            File;
+        false ->
+            request_file_field_value(FieldName, UploadedFiles, DefaultValue)
+    end.
+
+%% Update existing model from form
 update_model(Model, Data) ->
     update_model(Model, Data, Model:attributes()).
 
@@ -132,3 +176,17 @@ update_model(Model, Data, [{id, _Value} | Attrs]) ->
     update_model(Model, Data, Attrs);
 update_model(Model, Data, [{AttrName, Value} | Attrs]) ->
     update_model(Model:set(AttrName, proplists:get_value(AttrName, Data, Value)), Data, Attrs).
+
+%% Build helptext
+build_help_text(Options) ->
+    build_help_text(Options, table).
+
+build_help_text(Options, table) ->
+    io_lib:format("<br />~s", [build_help_text(Options, p)]);
+build_help_text(Options, p) ->
+    case proplists:get_value(help_text, Options) of
+        undefined ->
+            "";
+        Text ->
+            io_lib:format("<span class=\"helptext\">~s</span>", [Text])
+    end.

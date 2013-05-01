@@ -45,6 +45,12 @@ char_field_clean(Value) ->
     %% TODO: Add cleaning
     Value.
 
+file_field(Name, Options, Value) ->
+    boss_form_widget:widget(file_input, Name, Options, Value).
+
+file_field_clean(Value) ->
+    Value.
+
 choice_field(Name, Options, Value) ->
     boss_form_widget:widget(select, Name, Options, Value).
 
