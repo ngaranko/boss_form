@@ -88,7 +88,7 @@ validate_field(Form, FieldName, Options, RequestData) ->
 validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
     Value = case proplists:get_value(type, Options, char_field) of
                 file_field ->
-                    request_file_field_value(FieldName, UploadedFiles, proplists:get_value(initial, Options, undefined));
+                    request_file_field_value(FieldName, UploadedFiles, proplists:get_value(initial, Options, []));
                 _Other ->
                     request_field_value(FieldName, RequestData, proplists:get_value(initial, Options, undefined))
             end,
@@ -156,12 +156,20 @@ request_field_value(FieldName, RequestData, DefaultValue) ->
 request_file_field_value(FieldName, UploadedFiles) ->
     request_file_field_value(FieldName, UploadedFiles, undefined).
 
+request_file_field_value(_FieldName, [], []) ->
+    [];
 request_file_field_value(_FieldName, [], DefaultValue) ->
-    DefaultValue;
+    case length(DefaultValue) =:= 1 of
+        true ->
+            hd(DefaultValue);
+        false ->
+            DefaultValue
+    end;
+
 request_file_field_value(FieldName, [File | UploadedFiles], DefaultValue) ->
     case FieldName =:= list_to_atom(uploaded_file:field_name(File)) of
         true ->
-            File;
+            request_file_field_value(FieldName, UploadedFiles, [File | DefaultValue]);
         false ->
             request_file_field_value(FieldName, UploadedFiles, DefaultValue)
     end.
