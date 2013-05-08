@@ -25,6 +25,7 @@ Optional params:
 + required::atom() - true/false Notifies if field is required to be present while checking form contents, defaults to false.
 + initial::term() - Initial value for field
 + widget::tuple() - Custom field widget in form {Module, Function}, note that widget should be saved outside of parametrized modules (i.e. not in form module)
++ html_options::proplist() - List of html properties [{Key::term(), Value::string()}], will be added to output as Key="Value"
 
 Field specific params:
 
