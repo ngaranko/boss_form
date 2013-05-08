@@ -36,7 +36,9 @@ Examples
 
 Please see examples/ directory for sample app files.
 
-Todos:
+Todos
+-----
+
 - [ ] add most used django field types
 - [ ] add most used django widgets
 - [ ] add inline documentation
