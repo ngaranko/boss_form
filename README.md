@@ -3,112 +3,43 @@ boss_form
 
 Simple implementation of django forms for [ChicagoBoss](http://chicagoboss.org/).
 
-This module uses parameterized modules, so won't work with R16 :(
+This lib uses parameterized modules.
 
-Sample Usage
-------------
+Main purpose of this lib is to simplify form creation and processing.
 
-In order to define new form, just create module
+Form field definition
+---------------------
 
-```erlang
--module(login_form, [InitialData, Errors]).
--compile(export_all).
+Fields are defined in form_fields/0 function as proplist in form {field_name, Options}.
 
-%% define form fields inside form_fields function using list of tuples
-%%  in format {fieldname, [list of options as tuples]}
-%%  curently available field options are
-%%    {type, char_field/password_field}
-%%    {name, FieldName :: string()}
-%%    {required, true/false} - optional param
-%%
-%% type and name options are mandatory
-form_fields() ->
-    [
-     {username, [{type, char_field},
-                 {label, "Username"},
-                 {required, true}]},
-     {password, [{type, char_field},
-                 {widget, password_input},
-                 {label, "Password"},
-                 {required, true}]},
-     {remember, [{type, boolean_field},
-                 {label, "Remember me"}]},
-     {role, [{type, choice_field},
-             {choices, [{0, "None"}, {1, "Test"}]}]}
-    ].
+Field Options
+-------------
 
+Required params:
 
-%% data/0, errors/0 and fields/0 are required to be defined so far
-%% Proxies
-data() ->
-    InitialData.
++ type::atom() - field type, one of: [char_field, float_field, boolean_field, choice_field, file_field ] % please refer to [Field types and Widgets doc](README_FIELDS_AND_WIDGETS.md)
++ label::string() - field label as string
 
-errors() ->
-    io:format("Errors: ~p.~n", [InitialData]),
-    Errors.
+Optional params:
 
-fields() ->
-    boss_form:fields(form_fields(), InitialData).
++ required::atom() - true/false Notifies if field is required to be present while checking form contents, defaults to false.
++ initial::term() - Initial value for field
++ widget::tuple() - Custom field widget in form {Module, Function}, note that widget should be saved outside of parametrized modules (i.e. not in form module)
 
-as_table() ->
-    boss_form:as_table(form_fields(), InitialData, Errors).
+Field specific params:
 
++ float_field can have format::string() param, this format will be used by io_lib to format field value. Default: "~.2f"
++ choice_field can have choices::proplist() param, in form [{value::term(), title::string()}]
 
-%% Custom validation functions are possible
-%% just define *validate_fieldname* function with two params 
-%% Options - list of options, defined for this field inside form_fields function
-%% Req_Value - value provided by Request
-validate_password(_Options, RequestData) ->
-    case string:len(proplists:get_value("password", RequestData, "")) > 5 of
-        true -> ok;
-        false -> {error, "Password is too short"}
-    end.
+Examples
+--------
 
-```
+Please see examples/ directory for sample app files.
 
-Sample controller
------------------
-
-Sample controller can instantiate form using:
-
-```erlang
-Form = boss_form:new(login_form, []),
-```
-
-And here is code for validating incoming data
-
-```erlang
-
-case boss_form:validate(Form, Req:post_params()) of
-    {ok, CleanedData} ->
-        {output, "OK"};  %% This one is dummy output
-    {error, FormWithErrors} ->
-        {ok, [{form, FormWithErrors}]}
-end.
-
-```
-
-Sample html
------------
-
-```html
-<form action="" method="POST">
-{% if form.errors %}
-  {% for id, error in form.errors %}
-    {{ error }}
-  {% endfor %}
-{% endif %}
-
-{% for field in form.fields %}
-  {{ field.label }}: {{ field.html }}<br />
-{% endfor %}
-
-<table>
-    {{ form.as_table }}
-</table>
-
-<input type="submit" value="Login" />
-</form>
-```
-
-Please review examples directory for code example.
+Todos:
+- [ ] add most used django field types
+- [ ] add most used django widgets
+- [ ] add inline documentation
+- [ ] add django-like output formats as_p, etc.
+- [ ] replace io_lib formatting with dtl
+- [ ] get rid of proxy functions inside form definition [data/0, errors/0, fields/0, as_table/0]

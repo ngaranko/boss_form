@@ -7,7 +7,6 @@ widget(DefaultType, Name, Options, Value) ->
     Widget = proplists:get_value(widget, Options, DefaultType),
     case Widget of
         {Mod, Func} ->
-            io:format("Mod: ~p. Func: ~p.~n", [Mod, Func]),
             apply(Mod, Func, [Name, Value, Options]);
         Widget when is_atom(Widget) ->
             apply(boss_form_widget, Widget, [Name, Value, Options])
