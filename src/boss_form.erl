@@ -6,6 +6,10 @@
 new(FormModule, InitialData) ->
     FormModule:new(InitialData, []).
 
+%% Bootstrap new form
+new(FormModule, InitialData, FunTrans) when is_function(Funtrans)->
+    FormModule:new(InitialData, [], FunTrans).
+
 
 %% Draw html fields
 fields(Fields, InitialData) ->
