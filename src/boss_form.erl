@@ -89,6 +89,7 @@ get_processed_data(ProcessedFields, RequestData) ->
 %% Validate field
 validate_field(Form, FieldName, Options, RequestData) ->
     validate_field(Form, FieldName, Options, RequestData, []).
+
 validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
     Value = case proplists:get_value(type, Options, char_field) of
                 file_field ->
@@ -101,15 +102,28 @@ validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
         {error, ErrorData} ->
             {error, [FieldName, ErrorData]};
         OtherValue ->
+            ErrorMessages = proplists:get_value(error_messages, Options, []),
             case validate_required(Options, OtherValue) of
                 error ->
-                    ErrorMessages = proplists:get_value(error_messages, Options, []),
                     {error, [FieldName, proplists:get_value(requried, ErrorMessages, "This field is required")]};
                 ok ->
-                    case validate_apply_form(Form, FieldName, Options, RequestData) of
-                        ok -> {ok, FieldName, OtherValue};
-                        {ok, ValidValue} -> {ok, FieldName, ValidValue};
-                        {error, ErrorMessage} -> {error, [FieldName, ErrorMessage]}
+                    case validate_min_length(Options, OtherValue) of
+                        ok ->
+                            case validate_max_length(Options, OtherValue) of
+                                ok ->
+                                    case validate_apply_form(Form, FieldName, Options, RequestData) of
+                                        ok ->
+                                            {ok, FieldName, OtherValue};
+                                        {ok, ValidValue} ->
+                                            {ok, FieldName, ValidValue};
+                                        {error, ErrorMessage} ->
+                                            {error, [FieldName, ErrorMessage]}
+                                    end;
+                                {error, Message} ->
+                                    {error, [FieldName, proplists:get_value(max_length, ErrorMessages, Message)]}
+                            end;
+                        {error, Message} ->
+                            {error, [FieldName, proplists:get_value(min_length, ErrorMessages, Message)]}
                     end
             end
     end.
@@ -136,6 +150,35 @@ validate_required(Options, Value) ->
         _ -> 
             ok
     end.
+
+%% Check field min length
+validate_min_length(Options, Value) ->
+    case proplists:get_value(min_length, Options, false) of
+        MinLength when is_integer(MinLength), Value =/= "", Value =/= undefined ->
+            case MinLength > string:len(Value) of
+                true ->
+                    {error, io_lib:format("Field length is less than ~p", [MinLength])};
+                false ->
+                    ok
+            end;
+        _ ->
+            ok
+    end.
+
+%% Check field max lenght
+validate_max_length(Options, Value) ->
+    case proplists:get_value(max_length, Options, false) of
+        MaxLength when is_integer(MaxLength) ->
+            case MaxLength < string:len(Value) of
+                true ->
+                    {error, io_lib:format("Field length is more than ~s", [MaxLength])};
+                false ->
+                    ok
+            end;
+        _ ->
+            ok
+    end.
+        
 
 %% update form data from request
 update_form_data(Form, RequestData) ->
