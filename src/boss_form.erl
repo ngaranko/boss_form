@@ -7,21 +7,23 @@ new(FormModule, InitialData) ->
     FormModule:new(InitialData, []).
 
 %% Bootstrap new form
-new(FormModule, InitialData, FunTrans) when is_function(Funtrans)->
+new(FormModule, InitialData, FunTrans) when is_function(FunTrans)->
     FormModule:new(InitialData, [], FunTrans).
 
 
 %% Draw html fields
-fields(Fields, InitialData) ->
+fields(Fields, InitialData, Errors) ->
     [[{label, field_label(FieldName, Options)},
       {name, FieldName},
+      {type, get_field_type(Options)},
+      {value, request_field_value(FieldName, InitialData)},
+      {errors, get_field_errors(FieldName, Errors)},
       {html, field_html(FieldName, Options, InitialData)}] || {FieldName, Options} <- Fields].
 
 %% Draw form fields
 field_html(FieldName, Options, InitialData) ->
     Value = request_field_value(FieldName, InitialData, proplists:get_value(initial, Options)),
-    FieldType = proplists:get_value(type, Options, char_field),
-    apply(boss_form_fields, FieldType, [FieldName, Options, Value]).
+    apply(boss_form_fields, get_field_type(Options), [FieldName, Options, Value]).
 
 %% Draw field label
 field_label(FieldName, Options) ->
@@ -105,7 +107,7 @@ validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
             ErrorMessages = proplists:get_value(error_messages, Options, []),
             case validate_required(Options, OtherValue) of
                 error ->
-                    {error, [FieldName, proplists:get_value(requried, ErrorMessages, "This field is required")]};
+                    {error, {FieldName, proplists:get_value(requried, ErrorMessages, "This field is required")}};
                 ok ->
                     case validate_min_length(Options, OtherValue) of
                         ok ->
@@ -117,13 +119,13 @@ validate_field(Form, FieldName, Options, RequestData, UploadedFiles) ->
                                         {ok, ValidValue} ->
                                             {ok, FieldName, ValidValue};
                                         {error, ErrorMessage} ->
-                                            {error, [FieldName, ErrorMessage]}
+                                            {error, {FieldName, ErrorMessage}}
                                     end;
                                 {error, Message} ->
-                                    {error, [FieldName, proplists:get_value(max_length, ErrorMessages, Message)]}
+                                    {error, {FieldName, proplists:get_value(max_length, ErrorMessages, Message)}}
                             end;
                         {error, Message} ->
-                            {error, [FieldName, proplists:get_value(min_length, ErrorMessages, Message)]}
+                            {error, {FieldName, proplists:get_value(min_length, ErrorMessages, Message)}}
                     end
             end
     end.
@@ -220,6 +222,16 @@ request_file_field_value(FieldName, [File | UploadedFiles], DefaultValue) ->
         false ->
             request_file_field_value(FieldName, UploadedFiles, DefaultValue)
     end.
+
+%% Get field errors from Errors proplist
+get_field_errors(FieldName, Errors) ->
+    get_field_errors(FieldName, Errors, []).
+get_field_errors(FieldName, Errors, DefaultValue) ->
+    proplists:get_value(FieldName, Errors, DefaultValue).
+
+%% Get Field type
+get_field_type(Options) ->
+    proplists:get_value(type, Options, char_field).
 
 %% Update existing model from form
 update_model(Model, Data) ->
