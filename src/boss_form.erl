@@ -145,11 +145,11 @@ validate_apply_form(Form, FieldName, Options, RequestData) ->
 %% Check if field is required and has request value
 validate_required(Options, Value) ->
     case proplists:get_value(required, Options, false) of
-        true when Value =:= undefined->
+        true when Value =:= undefined ->
             error;
         true when Value =:= "" ->
             error;
-        _ -> 
+        _ ->
             ok
     end.
 
@@ -170,7 +170,7 @@ validate_min_length(Options, Value) ->
 %% Check field max lenght
 validate_max_length(Options, Value) ->
     case proplists:get_value(max_length, Options, false) of
-        MaxLength when is_integer(MaxLength) ->
+        MaxLength when is_integer(MaxLength), Value =/= "", Value =/= undefined ->
             case MaxLength < string:len(Value) of
                 true ->
                     {error, io_lib:format("Field length is more than ~s", [MaxLength])};
@@ -180,7 +180,6 @@ validate_max_length(Options, Value) ->
         _ ->
             ok
     end.
-        
 
 %% update form data from request
 update_form_data(Form, RequestData) ->
