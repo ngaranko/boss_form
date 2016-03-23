@@ -85,8 +85,8 @@ get_processed_data(ProcessedFields) ->
 
 get_processed_data(ProcessedFields, RequestData) ->
     CleanedData = get_processed_data(ProcessedFields),
-    [{list_to_atom(FieldName),
-     request_field_value(list_to_atom(FieldName), RequestData, proplists:get_value(list_to_atom(FieldName), CleanedData))} || {FieldName, _} <- RequestData].
+    [{FieldName,
+     request_field_value(FieldName, RequestData, proplists:get_value(FieldName, CleanedData))} || {FieldName, _} <- RequestData].
 
 %% Validate field
 validate_field(Form, FieldName, Options, RequestData) ->
@@ -154,7 +154,8 @@ validate_required(Options, Value) ->
     end.
 
 %% Check field min length
-validate_min_length(Options, Value) ->
+validate_min_length(Options, BinValue) ->
+    Value = binary_to_list(BinValue),
     case proplists:get_value(min_length, Options, false) of
         MinLength when is_integer(MinLength), Value =/= "", Value =/= undefined ->
             case MinLength > string:len(Value) of
@@ -168,7 +169,8 @@ validate_min_length(Options, Value) ->
     end.
 
 %% Check field max lenght
-validate_max_length(Options, Value) ->
+validate_max_length(Options, BinValue) ->
+    Value = binary_to_list(BinValue),
     case proplists:get_value(max_length, Options, false) of
         MaxLength when is_integer(MaxLength), Value =/= "", Value =/= undefined ->
             case MaxLength < string:len(Value) of
@@ -194,7 +196,13 @@ request_field_value(FieldName, RequestData) ->
     request_field_value(FieldName, RequestData, undefined).
 
 request_field_value(FieldName, RequestData, DefaultValue) ->
-    case proplists:get_value(FieldName, RequestData, proplists:get_value(atom_to_list(FieldName), RequestData)) of
+    BinFieldName = case is_atom(FieldName) of
+                       true ->
+                           atom_to_binary(FieldName, utf8);
+                       false ->
+                           FieldName
+                   end,
+    case proplists:get_value(FieldName, RequestData, proplists:get_value(BinFieldName, RequestData)) of
         undefined -> DefaultValue;
         "" -> DefaultValue;
         Other -> Other
