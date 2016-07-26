@@ -1,9 +1,8 @@
-boss_form
+boss_form [![Build Status](https://travis-ci.org/ngaranko/boss_form.svg?branch=alpha)](https://travis-ci.org/ngaranko/boss_form)
 =========
 
 Simple implementation of django forms for [ChicagoBoss](http://chicagoboss.org/).
 
-This lib uses parameterized modules.
 
 Main purpose of this lib is to simplify form creation and processing.
 
