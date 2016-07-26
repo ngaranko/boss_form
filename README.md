@@ -6,6 +6,77 @@ Simple implementation of django forms for [ChicagoBoss](http://chicagoboss.org/)
 
 Main purpose of this lib is to simplify form creation and processing.
 
+Usage
+------
+
+```erlang
+% ChicagoBoss controller.
+login('GET', [], Context) ->
+    Form = boss_form:new(login_form, []),
+    {ok, [{form, Form}] ++ Context};
+
+login('POST', [], Context) ->
+    Form = boss_form:new(login_form, Req:post_params()),
+    case boss_form:is_valid(Form) of
+        {ok, CleanedForm} ->
+            boss_session:set_session_data(SessionID, username, proplists:get_value(username, CleanedForm#boss_form.cleaned_data)),
+            {redirect, "/panel"};
+        {error, FormWithErrors} ->
+            {ok, [{form, FormWithErrors}] ++ Context}
+    end.
+```
+
+Example form
+--------------
+
+```erlang
+-module(test_form).
+-compile(export_all).
+
+form_fields() ->
+    [
+     {username, [{type, char_field},
+                 {label, "Username"},
+                 {required, true},
+                 {min_length, 5},
+                 {max_length, 255},
+                 {html_options, [{class, "form-control"},
+                                {placeholder, "Email address"},
+                                {autofocus, autofocus},
+                                {required, required}]}]},
+     {password, [{type, char_field},
+                 {widget, password_input},
+                 {label, "Password"},
+                 {min_length, 5},
+                 {max_length, 25},
+                 {required, true},
+                 {html_options, [{class, "form-control"},
+                                {placeholder, "Password"},
+                                {required, required}]}]}
+    ].
+```
+
+Example template
+--------------------
+
+```html
+<form class="form-signin" role="form" method="POST">
+  {{ csrf_token|safe }}
+  <h2 class="form-signin-heading">Please sign in</h2>
+  {% for error, text in form.errors %}
+    {{ error }}: {{ text }}<br />
+  {% endfor %}
+  {% for field in form.fields %}
+      <div class="{% if field.errors %} has-error{% endif %}">
+          {{ field.html|safe }}
+      </div>
+  {% endfor %}
+  <button type="submit">Sign in</button>
+</form>
+
+```
+
+
 Form field definition
 ---------------------
 
