@@ -1,14 +1,42 @@
 -module(boss_form).
+-include("../include/boss_form.hrl").
 -compile(export_all).
+
 
 
 %% Bootstrap new form
 new(FormModule, InitialData) ->
-    FormModule:new(InitialData, []).
+    #boss_form{module=FormModule,
+               fields=FormModule:form_fields(),
+               data=InitialData}.
+
+
+%% Form Validation
+is_valid(FormRecord) ->
+    %ProcessedFields = [validate_field(Form,
+    %                                  FieldName,
+    %                                  Options,
+    %                                  RequestData,
+    %                                  UploadedFiles) || {FieldName, Options} <- FormRe:form_fields()],
+    ProcessedFields = [boss_form_validate:field(
+                         FormRecord,
+                         FieldName,
+                         Options) || {FieldName, Options} <- FormRecord#boss_form.fields],
+    case proplists:is_defined(error, ProcessedFields) of
+        true ->
+            % FormData = update_form_data(Form, get_processed_data(ProcessedFields, RequestData)),
+            {error, FormRecord#boss_form{errors=[Data || {error, Data} <- ProcessedFields]}};
+        false ->
+            {ok, FormRecord#boss_form{cleaned_data=get_processed_data(ProcessedFields)}}
+    end.
+
+
+
+
 
 %% Bootstrap new form
-new(FormModule, InitialData, FunTrans) when is_function(FunTrans)->
-    FormModule:new(InitialData, [], FunTrans).
+%%new(FormModule, InitialData, FunTrans) when is_function(FunTrans)->
+%%     FormModule:new(InitialData, [], FunTrans).
 
 
 %% Draw html fields

@@ -1,0 +1,9 @@
+-record(boss_form,
+        {
+          module,
+          fields=[],
+          data=[],
+          files=[],
+          cleaned_data=[],
+          errors=[]
+        }).
